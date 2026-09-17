@@ -4,8 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import TodoList from "./components/TodoList";
 
-const API_URL = "http://localhost:5000/api";
-
+const API_URL = "/api";
 function App() {
   const [user, setUser] = useState(null);
   const [isLogin, setIsLogin] = useState(true);
