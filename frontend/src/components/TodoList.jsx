@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import TodoForm from "./TodoForm";
-import TodoItem from "./TodoItem";
+import TodoTable from "./TodoTable";
 import ThemeToggle from "./ThemeToggle";
 import { useToast } from "./ToastContext";
+import ProfileModal from "./ProfileModal";
+
 function TodoList({ user, setUser, API_URL }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,7 @@ function TodoList({ user, setUser, API_URL }) {
   const [priority, setPriority] = useState("");
   const [sort, setSort] = useState("");
   const [page, setPage] = useState(1);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -262,8 +265,6 @@ function TodoList({ user, setUser, API_URL }) {
             Statistics
           </button>
         </nav>
-
-        {/* User Profile + Theme + Logout */}
         <div className="border-t border-slate-100 p-3 dark:border-slate-700">
           {/* Theme Toggle Row */}
           <div className="mb-2 flex items-center justify-between rounded-lg px-3 py-2">
@@ -280,12 +281,31 @@ function TodoList({ user, setUser, API_URL }) {
             </div>
           </div>
 
-          {/* User Profile Row */}
-          <div className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-              {user?.name?.charAt(0) || "U"}
-            </div>
-            <div className="min-w-0">
+          {/* User Profile Row — Clickable */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowProfileModal(true);
+              closeSidebar();
+            }}
+            className="mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            {user?.profile_image ? (
+              <img
+                src={
+                  user.profile_image.startsWith("http")
+                    ? user.profile_image
+                    : `${API_URL}${user.profile_image}`
+                }
+                alt={user?.name || "User"}
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold uppercase text-white">
+                {user?.name?.charAt(0) || "U"}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {user?.name || "User"}
               </p>
@@ -293,7 +313,16 @@ function TodoList({ user, setUser, API_URL }) {
                 {user?.email || ""}
               </p>
             </div>
-          </div>
+            <svg
+              className="h-4 w-4 shrink-0 text-slate-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
 
           {/* Logout Button */}
           <button
@@ -352,9 +381,29 @@ function TodoList({ user, setUser, API_URL }) {
           <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
             Task Manager
           </p>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-            {user?.name?.charAt(0) || "U"}
-          </div>
+          {/* Mobile Avatar — Clickable */}
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            className="shrink-0"
+            aria-label="Open profile"
+          >
+            {user?.profile_image ? (
+              <img
+                src={
+                  user.profile_image.startsWith("http")
+                    ? user.profile_image
+                    : `${API_URL}${user.profile_image}`
+                }
+                alt={user?.name || "User"}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold uppercase text-white">
+                {user?.name?.charAt(0) || "U"}
+              </div>
+            )}
+          </button>
         </header>
 
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -637,19 +686,14 @@ function TodoList({ user, setUser, API_URL }) {
                 </div>
               )}
 
-              {/* Task List */}
+              {/* ============ TASK LIST — DATATABLE ============ */}
               {!loading && !error && tasks.length > 0 && (
-                <div className="space-y-3">
-                  {tasks.map((task) => (
-                    <TodoItem
-                      key={task.id}
-                      task={task}
-                      API_URL={API_URL}
-                      onTaskUpdated={handleTaskUpdated}
-                      onTaskDeleted={handleTaskDeleted}
-                    />
-                  ))}
-                </div>
+                <TodoTable
+                  tasks={tasks}
+                  API_URL={API_URL}
+                  onTaskUpdated={handleTaskUpdated}
+                  onTaskDeleted={handleTaskDeleted}
+                />
               )}
 
               {/* Pagination */}
@@ -692,6 +736,15 @@ function TodoList({ user, setUser, API_URL }) {
           </div>
         </main>
       </div>
+
+      {/* ============ PROFILE MODAL ============ */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        user={user}
+        setUser={setUser}
+        API_URL={API_URL}
+      />
     </div>
   );
 }
