@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import streamifier from "streamifier";
+import cloudinary from "../config/cloudinary.js";
 import { generateToken } from "../utils/generateToken.js";
 import {
   createUser,
@@ -8,6 +10,26 @@ import {
   updateUserPassword,
   deleteUserById,
 } from "../models/userModel.js";
+
+// =====================================================
+// HELPER — Upload image to Cloudinary
+// =====================================================
+const uploadToCloudinary = (buffer, userId) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "taskmanager/profiles",
+        public_id: `profile_${userId}_${Date.now()}`,
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
+};
 
 // =====================================================
 // REGISTER
@@ -161,7 +183,7 @@ export const logout = (req, res) => {
 };
 
 // =====================================================
-// UPDATE PROFILE — Name, Email, Image
+// UPDATE PROFILE — Name, Email, Image (Cloudinary)
 // PUT /api/auth/profile
 // =====================================================
 export const updateProfile = async (req, res) => {
@@ -216,8 +238,20 @@ export const updateProfile = async (req, res) => {
     let newProfileImage = undefined;
 
     if (req.file) {
-      // File uploaded
-      newProfileImage = `/uploads/profiles/${req.file.filename}`;
+      // ✅ File uploaded — Cloudinary par bhejein
+      try {
+        const cloudinaryResult = await uploadToCloudinary(
+          req.file.buffer,
+          req.userId
+        );
+        newProfileImage = cloudinaryResult.secure_url;
+      } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload image to Cloudinary",
+        });
+      }
     } else if (imageUrl && imageUrl.trim()) {
       // URL provided
       newProfileImage = imageUrl.trim();
@@ -350,6 +384,19 @@ export const deleteAccount = async (req, res) => {
         success: false,
         message: "Password is incorrect",
       });
+    }
+
+    // Optional: Delete profile image from Cloudinary
+    if (user.profile_image && user.profile_image.includes("cloudinary")) {
+      try {
+        const urlParts = user.profile_image.split("/");
+        const filename = urlParts[urlParts.length - 1];
+        const publicId = `taskmanager/profiles/${filename.split(".")[0]}`;
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {
+        console.error("Cloudinary delete error:", err);
+        // Don't fail if image deletion fails
+      }
     }
 
     await deleteUserById(req.userId);
