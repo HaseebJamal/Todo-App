@@ -632,8 +632,6 @@ function TodoList({ user, setUser, API_URL }) {
                   </button>
                 )}
               </div>
-
-              {/* Loading State */}
               {loading && (
                 <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-800">
                   <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
@@ -642,8 +640,6 @@ function TodoList({ user, setUser, API_URL }) {
                   </p>
                 </div>
               )}
-
-              {/* Error State */}
               {error && !loading && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-900/20">
                   <p className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -661,8 +657,6 @@ function TodoList({ user, setUser, API_URL }) {
                   </button>
                 </div>
               )}
-
-              {/* Empty State */}
               {!loading && !error && tasks.length === 0 && (
                 <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-800">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
@@ -685,8 +679,6 @@ function TodoList({ user, setUser, API_URL }) {
                   </p>
                 </div>
               )}
-
-              {/* ============ TASK LIST — DATATABLE ============ */}
               {!loading && !error && tasks.length > 0 && (
                 <TodoTable
                   tasks={tasks}
@@ -695,8 +687,6 @@ function TodoList({ user, setUser, API_URL }) {
                   onTaskDeleted={handleTaskDeleted}
                 />
               )}
-
-              {/* Pagination */}
               {!loading && !error && pagination.totalPages > 0 && (
                 <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row dark:border-slate-700 dark:bg-slate-800">
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -736,8 +726,6 @@ function TodoList({ user, setUser, API_URL }) {
           </div>
         </main>
       </div>
-
-      {/* ============ PROFILE MODAL ============ */}
       <ProfileModal
         isOpen={showProfileModal}
         onClose={() => setShowProfileModal(false)}

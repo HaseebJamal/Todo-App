@@ -1,15 +1,12 @@
 import { useState } from "react";
 import TodoRow from "./TodoRow";
 import { useToast } from "./ToastContext";
-
 function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
   const toast = useToast();
   const [selectedIds, setSelectedIds] = useState([]);
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
   const [bulkLoading, setBulkLoading] = useState(false);
-
-  // ============ SORT ============
   const handleSort = (key) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -18,31 +15,24 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
       setSortDir("asc");
     }
   };
-
   const sortedTasks = [...tasks].sort((a, b) => {
     if (!sortKey) return 0;
     let aVal = a[sortKey];
     let bVal = b[sortKey];
-
     if (sortKey === "due_date") {
       aVal = aVal ? new Date(aVal).getTime() : Infinity;
       bVal = bVal ? new Date(bVal).getTime() : Infinity;
     }
-
     if (sortKey === "priority") {
       const order = { urgent: 0, high: 1, medium: 2, low: 3 };
       aVal = order[aVal] ?? 4;
       bVal = order[bVal] ?? 4;
     }
-
     if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
     if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
     return 0;
   });
-
-  // ============ SELECT ============
-  const allSelected =
-    tasks.length > 0 && selectedIds.length === tasks.length;
+  const allSelected = tasks.length > 0 && selectedIds.length === tasks.length;
 
   const toggleAll = () => {
     if (allSelected) setSelectedIds([]);
@@ -51,20 +41,17 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
-
-  // ============ BULK ACTIONS ============
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (
       !window.confirm(
-        `Delete ${selectedIds.length} task${selectedIds.length > 1 ? "s" : ""}?`
+        `Delete ${selectedIds.length} task${selectedIds.length > 1 ? "s" : ""}?`,
       )
     )
       return;
-
     setBulkLoading(true);
     let successCount = 0;
 
@@ -82,21 +69,17 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
         console.error(err);
       }
     }
-
     setSelectedIds([]);
     setBulkLoading(false);
     toast.success(`${successCount} task${successCount > 1 ? "s" : ""} deleted`);
   };
-
   const handleBulkComplete = async () => {
     if (selectedIds.length === 0) return;
     setBulkLoading(true);
     let successCount = 0;
-
     for (const id of selectedIds) {
       const task = tasks.find((t) => t.id === id);
       if (!task || task.status === "completed") continue;
-
       try {
         const res = await fetch(`${API_URL}/tasks/${id}`, {
           method: "PUT",
@@ -119,15 +102,12 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
         console.error(err);
       }
     }
-
     setSelectedIds([]);
     setBulkLoading(false);
     toast.success(
-      `${successCount} task${successCount > 1 ? "s" : ""} completed`
+      `${successCount} task${successCount > 1 ? "s" : ""} completed`,
     );
   };
-
-  // ============ SORT ICON ============
   const SortIcon = ({ columnKey }) => {
     if (sortKey !== columnKey) {
       return (
@@ -164,10 +144,8 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
       </svg>
     );
   };
-
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-      {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
         <div className="flex items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-800/50 dark:bg-blue-900/20">
           <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
@@ -200,8 +178,6 @@ function TodoTable({ tasks, API_URL, onTaskUpdated, onTaskDeleted }) {
           </div>
         </div>
       )}
-
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/50">

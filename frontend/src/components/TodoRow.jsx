@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "./ToastContext";
 import ConfirmModal from "./ConfirmModal";
-
 function TodoRow({
   task,
   API_URL,
@@ -15,52 +14,73 @@ function TodoRow({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: task.title || "",
+    description: task.description || "",
+    priority: task.priority || "medium",
+    status: task.status || "pending",
+    dueDate: task.due_date ? task.due_date.split("T")[0] : "",
+  });
   const dropdownRef = useRef(null);
-
-  // Close dropdown on outside click
   useEffect(() => {
+    setEditForm({
+      title: task.title || "",
+      description: task.description || "",
+      priority: task.priority || "medium",
+      status: task.status || "pending",
+      dueDate: task.due_date ? task.due_date.split("T")[0] : "",
+    });
+  }, [task]);
+useEffect(() => {
     const handleClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setShowActions(false);
       }
     };
+
     if (showActions) {
       document.addEventListener("mousedown", handleClick);
-      return () => document.removeEventListener("mousedown", handleClick);
+
+      return () => {
+        document.removeEventListener("mousedown", handleClick);
+      };
     }
   }, [showActions]);
-
-  // ============ STYLES ============
   const getPriorityStyles = () => {
-    if (task.priority === "urgent")
+    if (task.priority === "urgent") {
       return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800/50";
-    if (task.priority === "high")
+    }
+    if (task.priority === "high") {
       return "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/50";
-    if (task.priority === "medium")
+    }
+    if (task.priority === "medium") {
       return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/50";
+    }
     return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800/50";
   };
-
   const getPriorityDot = () => {
     if (task.priority === "urgent") return "bg-purple-500";
     if (task.priority === "high") return "bg-red-500";
     if (task.priority === "medium") return "bg-amber-500";
+
     return "bg-emerald-500";
   };
-
   const getStatusStyles = () => {
-    if (task.status === "completed")
+    if (task.status === "completed") {
       return "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-    if (task.status === "cancelled")
+    }
+    if (task.status === "cancelled") {
       return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+    }
     return "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300";
   };
-
   const formatDue = (dateStr) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
     const now = new Date();
-    const isOverdue = date < now && task.status !== "completed";
+    const isOverdue =
+      date < now && task.status !== "completed" && task.status !== "cancelled";
     return {
       text: date.toLocaleDateString("en-US", {
         month: "short",
@@ -70,19 +90,16 @@ function TodoRow({
       isOverdue,
     };
   };
-
-  const dueInfo = task.due_date ? formatDue(task.due_date) : null;
-
-  // ============ ACTIONS ============
-  const handleToggleComplete = async () => {
+  const dueInfo = task.due_date ? formatDue(task.due_date) : null;  const handleToggleComplete = async () => {
     setLoading(true);
     setShowActions(false);
     const newStatus = task.status === "completed" ? "pending" : "completed";
-
     try {
       const response = await fetch(`${API_URL}/tasks/${task.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         credentials: "include",
         body: JSON.stringify({
           title: task.title,
@@ -92,13 +109,11 @@ function TodoRow({
           status: newStatus,
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         toast.error(data.message || "Failed to update task");
         return;
       }
-
       onTaskUpdated(data.task);
       toast.success(
         newStatus === "completed"
@@ -112,16 +127,84 @@ function TodoRow({
       setLoading(false);
     }
   };
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    const title = editForm.title.trim();
+    const description = editForm.description.trim();
+    if (!title) {
+      toast.error("Task title is required");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/tasks/${task.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          title,
+          description,
+          priority: editForm.priority,
+          dueDate: editForm.dueDate || null, status: editForm.status,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.message || "Failed to update task");
+        return;
+      }
+      onTaskUpdated(data.task);
+      setIsEditing(false);
+      setShowActions(false);
+      toast.success("Task updated successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Unable to connect to server");
+    } finally {
+      setLoading(false);
+    }
+  };const handleStartEdit = () => {
+    setEditForm({
+      title: task.title || "",
+      description: task.description || "",
+      priority: task.priority || "medium",
+      status: task.status || "pending",
+      dueDate: task.due_date ? task.due_date.split("T")[0] : "",
+    });
+    setShowActions(false);
+    setIsEditing(true);
+    setIsExpanded(true);
+  };
+  const handleCancelEdit = () => {
+    setEditForm({
+      title: task.title || "",
+      description: task.description || "",
+      priority: task.priority || "medium",
+      status: task.status || "pending",
+      dueDate: task.due_date ? task.due_date.split("T")[0] : "",
+    });
 
+    setIsEditing(false);
+  };
   const handleDelete = async () => {
     setLoading(true);
+
     try {
       const response = await fetch(`${API_URL}/tasks/${task.id}`, {
         method: "DELETE",
         credentials: "include",
       });
       const data = await response.json();
-      if (!response.ok) {
+if (!response.ok) {
         toast.error(data.message || "Failed to delete task");
         return;
       }
@@ -135,7 +218,6 @@ function TodoRow({
       setLoading(false);
     }
   };
-
   return (
     <>
       <ConfirmModal
@@ -148,15 +230,11 @@ function TodoRow({
         loading={loading}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteModal(false)}
-      />
-
-      {/* Main Row */}
-      <tr
+      />      <tr
         className={`group border-b border-slate-100 transition hover:bg-slate-50/50 dark:border-slate-700 dark:hover:bg-slate-800/50 ${
           isSelected ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
         }`}
       >
-        {/* Checkbox */}
         <td className="w-10 px-3 py-2">
           <input
             type="checkbox"
@@ -165,9 +243,7 @@ function TodoRow({
             className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
           />
         </td>
-
-        {/* Complete Toggle */}
-        <td className="w-10 px-2 py-2">
+ <td className="w-10 px-2 py-2">
           <button
             type="button"
             onClick={handleToggleComplete}
@@ -191,13 +267,10 @@ function TodoRow({
               </svg>
             )}
           </button>
-        </td>
-
-        {/* Task Title + Description */}
-        <td className="min-w-0 px-2 py-2">
+        </td>  <td className="min-w-0 px-2 py-2">
           <button
             type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => setIsExpanded((prev) => !prev)}
             className="flex w-full items-start gap-2 text-left"
           >
             <svg
@@ -229,8 +302,6 @@ function TodoRow({
             </div>
           </button>
         </td>
-
-        {/* Priority */}
         <td className="w-28 px-2 py-2">
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${getPriorityStyles()}`}
@@ -239,8 +310,6 @@ function TodoRow({
             {task.priority}
           </span>
         </td>
-
-        {/* Status */}
         <td className="w-24 px-2 py-2">
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium capitalize ${getStatusStyles()}`}
@@ -251,8 +320,6 @@ function TodoRow({
             {task.status}
           </span>
         </td>
-
-        {/* Due Date */}
         <td className="w-32 px-2 py-2">
           {dueInfo ? (
             <span
@@ -274,6 +341,7 @@ function TodoRow({
                 <line x1="8" x2="8" y1="2" y2="6" />
                 <line x1="3" x2="21" y1="10" y2="10" />
               </svg>
+
               {dueInfo.text}
             </span>
           ) : (
@@ -282,13 +350,11 @@ function TodoRow({
             </span>
           )}
         </td>
-
-        {/* Actions Dropdown */}
         <td className="w-12 px-2 py-2 text-right">
           <div className="relative inline-block" ref={dropdownRef}>
             <button
               type="button"
-              onClick={() => setShowActions(!showActions)}
+              onClick={() => setShowActions((prev) => !prev)}
               disabled={loading}
               className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 dark:hover:bg-slate-700 dark:hover:text-slate-200"
               aria-label="Actions"
@@ -305,26 +371,36 @@ function TodoRow({
                 <circle cx="12" cy="19" r="1" />
               </svg>
             </button>
-
             {showActions && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+              <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
                 <button
                   type="button"
+                  onClick={handleStartEdit}
+                  disabled={loading}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  ✏️ Edit
+                </button>
+                <div className="border-t border-slate-100 dark:border-slate-700" />
+<button
+                  type="button"
                   onClick={handleToggleComplete}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                  disabled={loading}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   {task.status === "completed"
                     ? "⏳ Mark Pending"
                     : "✅ Mark Complete"}
                 </button>
                 <div className="border-t border-slate-100 dark:border-slate-700" />
-                <button
+     <button
                   type="button"
                   onClick={() => {
                     setShowActions(false);
                     setShowDeleteModal(true);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  disabled={loading}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
                 >
                   🗑️ Delete
                 </button>
@@ -333,50 +409,144 @@ function TodoRow({
           </div>
         </td>
       </tr>
-
-      {/* Expanded Row */}
       {isExpanded && (
         <tr className="border-b border-slate-100 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30">
           <td colSpan={7} className="px-6 py-4">
-            <div className="space-y-3 text-sm">
-              {task.description && (
+            {isEditing ? (
+              <form onSubmit={handleUpdate} className="space-y-4">
                 <div>
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Description
-                  </p>
-                  <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">
-                    {task.description}
-                  </p>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={editForm.title}
+                    onChange={handleEditChange}
+                    disabled={loading}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                  />
                 </div>
-              )}
-              <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                <span>
-                  <strong className="text-slate-700 dark:text-slate-300">
-                    Priority:
-                  </strong>{" "}
-                  {task.priority}
-                </span>
-                <span>
-                  <strong className="text-slate-700 dark:text-slate-300">
-                    Status:
-                  </strong>{" "}
-                  {task.status}
-                </span>
-                {task.due_date && (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={editForm.description}
+                    onChange={handleEditChange}
+                    disabled={loading}
+                    rows={3}
+                    className="w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                  />
+                </div>
+<div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Priority
+                    </label>
+                    <select
+                      name="priority"
+                      value={editForm.priority}
+                      onChange={handleEditChange}
+                      disabled={loading}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Status
+                    </label>
+                    <select
+                      name="status"
+                      value={editForm.status}
+                      onChange={handleEditChange}
+                      disabled={loading}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      name="dueDate"
+                      value={editForm.dueDate}
+                      onChange={handleEditChange}
+                      disabled={loading}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={loading}
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3 text-sm">
+                {task.description && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Description
+                    </p>
+
+                    <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">
+                      {task.description}
+                    </p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
                   <span>
                     <strong className="text-slate-700 dark:text-slate-300">
-                      Due:
+                      Priority:
                     </strong>{" "}
-                    {new Date(task.due_date).toLocaleString()}
+                    {task.priority}
+                  </span>{" "}
+                  <span>
+                    <strong className="text-slate-700 dark:text-slate-300">
+                      Status:
+                    </strong>{" "}
+                    {task.status}
                   </span>
-                )}
+                  {task.due_date && (
+                    <span>
+                      <strong className="text-slate-700 dark:text-slate-300">
+                        Due:
+                      </strong>{" "}
+                      {new Date(task.due_date).toLocaleString()}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </td>
         </tr>
       )}
     </>
   );
 }
-
 export default TodoRow;
