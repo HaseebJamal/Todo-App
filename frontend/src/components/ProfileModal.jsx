@@ -68,11 +68,10 @@ function ProfileModal({ isOpen, onClose, user, setUser, API_URL }) {
   }, [isOpen]);
 
   // Image URL
-  const getImageSrc = (path) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    return `${API_URL}${path}`;
-  };
+ const getImageSrc = (path) => {
+  if (!path) return null;
+  return path;
+};
 
   // ========== FILE SELECT ==========
   const handleFileSelect = (e) => {

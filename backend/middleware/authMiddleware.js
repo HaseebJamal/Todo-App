@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 export const protect = (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies?.token;
 
     if (!token) {
       return res.status(401).json({
@@ -19,7 +19,10 @@ export const protect = (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("Authentication error:", error.message);
+    console.error(
+      "Authentication error:",
+      error.message
+    );
 
     return res.status(401).json({
       success: false,
@@ -27,3 +30,4 @@ export const protect = (req, res, next) => {
     });
   }
 };
+

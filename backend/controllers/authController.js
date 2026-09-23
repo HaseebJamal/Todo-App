@@ -1,7 +1,9 @@
 import bcrypt from "bcryptjs";
-import streamifier from "streamifier";
-import cloudinary from "../config/cloudinary.js";
+import fs from "fs";
+import path from "path";
+
 import { generateToken } from "../utils/generateToken.js";
+
 import {
   createUser,
   findUserByEmail,
@@ -12,28 +14,23 @@ import {
 } from "../models/userModel.js";
 
 // =====================================================
-// HELPER — Upload image to Cloudinary
+// COOKIE OPTIONS
 // =====================================================
-const uploadToCloudinary = (buffer, userId) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "taskmanager/profiles",
-        public_id: `profile_${userId}_${Date.now()}`,
-        resource_type: "image",
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    );
-    streamifier.createReadStream(buffer).pipe(uploadStream);
-  });
-};
+
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.COOKIE_SECURE === "true",
+  sameSite:
+    process.env.COOKIE_SECURE === "true"
+      ? "none"
+      : "lax",
+  maxAge: 15 * 60 * 1000,
+});
 
 // =====================================================
 // REGISTER
 // =====================================================
+
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -56,6 +53,7 @@ export const register = async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
 
     const existingUser = await findUserByEmail(cleanEmail);
+
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -64,7 +62,12 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await createUser(cleanName, cleanEmail, hashedPassword);
+
+    const user = await createUser(
+      cleanName,
+      cleanEmail,
+      hashedPassword
+    );
 
     return res.status(201).json({
       success: true,
@@ -73,6 +76,7 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error("Registration error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -83,6 +87,7 @@ export const register = async (req, res) => {
 // =====================================================
 // LOGIN
 // =====================================================
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -95,6 +100,7 @@ export const login = async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
     const user = await findUserByEmail(cleanEmail);
 
     if (!user) {
@@ -104,7 +110,11 @@ export const login = async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
+    );
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -113,12 +123,8 @@ export const login = async (req, res) => {
     }
 
     const token = generateToken(user.id);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 15 * 60 * 1000,
-    });
+
+    res.cookie("token", token, getCookieOptions());
 
     return res.status(200).json({
       success: true,
@@ -132,6 +138,7 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -142,6 +149,7 @@ export const login = async (req, res) => {
 // =====================================================
 // GET ME
 // =====================================================
+
 export const getMe = async (req, res) => {
   try {
     const user = await findUserById(req.userId);
@@ -159,6 +167,7 @@ export const getMe = async (req, res) => {
     });
   } catch (error) {
     console.error("Get user error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -169,12 +178,14 @@ export const getMe = async (req, res) => {
 // =====================================================
 // LOGOUT
 // =====================================================
+
 export const logout = (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  });
+  const cookieOptions = getCookieOptions();
+
+  // maxAge clear karte waqt required nahi
+  delete cookieOptions.maxAge;
+
+  res.clearCookie("token", cookieOptions);
 
   return res.status(200).json({
     success: true,
@@ -183,14 +194,19 @@ export const logout = (req, res) => {
 };
 
 // =====================================================
-// UPDATE PROFILE — Name, Email, Image (Cloudinary)
+// UPDATE PROFILE
+// Name, Email, Image
 // PUT /api/auth/profile
 // =====================================================
+
 export const updateProfile = async (req, res) => {
   try {
     const { name, email, imageUrl } = req.body;
 
-    // Validation
+    // =================================================
+    // VALIDATION
+    // =================================================
+
     if (!name?.trim()) {
       return res.status(400).json({
         success: false,
@@ -206,6 +222,7 @@ export const updateProfile = async (req, res) => {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!emailRegex.test(email.trim())) {
       return res.status(400).json({
         success: false,
@@ -216,8 +233,12 @@ export const updateProfile = async (req, res) => {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check if email taken by another user
+    // =================================================
+    // CHECK EMAIL
+    // =================================================
+
     const existingUser = await findUserByEmail(cleanEmail);
+
     if (existingUser && existingUser.id !== req.userId) {
       return res.status(409).json({
         success: false,
@@ -225,8 +246,12 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Get current user
+    // =================================================
+    // GET CURRENT USER
+    // =================================================
+
     const currentUser = await findUserById(req.userId);
+
     if (!currentUser) {
       return res.status(404).json({
         success: false,
@@ -234,33 +259,90 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    // Determine profile image value
+    // =================================================
+    // PROFILE IMAGE
+    // =================================================
+
     let newProfileImage = undefined;
 
+    // -------------------------------------------------
+    // New image uploaded through Multer
+    // -------------------------------------------------
+
     if (req.file) {
-      // ✅ File uploaded — Cloudinary par bhejein
-      try {
-        const cloudinaryResult = await uploadToCloudinary(
-          req.file.buffer,
-          req.userId
+      newProfileImage = `/uploads/profiles/${req.file.filename}`;
+
+      // Delete old local image if exists
+      if (
+        currentUser.profile_image &&
+        currentUser.profile_image.startsWith("/uploads/")
+      ) {
+        const oldImagePath = path.join(
+          process.cwd(),
+          currentUser.profile_image.replace(
+            /^\/uploads\//,
+            "uploads/"
+          )
         );
-        newProfileImage = cloudinaryResult.secure_url;
-      } catch (uploadError) {
-        console.error("Cloudinary upload error:", uploadError);
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload image to Cloudinary",
-        });
+
+        try {
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+          }
+        } catch (error) {
+          console.error(
+            "Old profile image delete error:",
+            error.message
+          );
+        }
       }
-    } else if (imageUrl && imageUrl.trim()) {
-      // URL provided
-      newProfileImage = imageUrl.trim();
-    } else if (imageUrl === "") {
-      // Explicit remove
-      newProfileImage = null;
     }
 
-    // Update user
+    // -------------------------------------------------
+    // URL provided
+    // -------------------------------------------------
+
+    else if (imageUrl && imageUrl.trim()) {
+      newProfileImage = imageUrl.trim();
+    }
+
+    // -------------------------------------------------
+    // Explicit remove image
+    // -------------------------------------------------
+
+    else if (imageUrl === "") {
+      newProfileImage = null;
+
+      // Delete old local image
+      if (
+        currentUser.profile_image &&
+        currentUser.profile_image.startsWith("/uploads/")
+      ) {
+        const oldImagePath = path.join(
+          process.cwd(),
+          currentUser.profile_image.replace(
+            /^\/uploads\//,
+            "uploads/"
+          )
+        );
+
+        try {
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+          }
+        } catch (error) {
+          console.error(
+            "Profile image delete error:",
+            error.message
+          );
+        }
+      }
+    }
+
+    // =================================================
+    // UPDATE USER
+    // =================================================
+
     const updatedUser = await updateUserProfile(
       req.userId,
       cleanName,
@@ -275,6 +357,7 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Update profile error:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message || "Server error",
@@ -286,11 +369,20 @@ export const updateProfile = async (req, res) => {
 // UPDATE PASSWORD
 // PUT /api/auth/password
 // =====================================================
+
 export const updatePassword = async (req, res) => {
   try {
-    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = req.body;
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (
+      !currentPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -300,7 +392,8 @@ export const updatePassword = async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: "New password must be at least 6 characters",
+        message:
+          "New password must be at least 6 characters",
       });
     }
 
@@ -314,11 +407,13 @@ export const updatePassword = async (req, res) => {
     if (currentPassword === newPassword) {
       return res.status(400).json({
         success: false,
-        message: "New password must be different from current",
+        message:
+          "New password must be different from current",
       });
     }
 
     const user = await findUserById(req.userId);
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -338,9 +433,15 @@ export const updatePassword = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      12
+    );
 
-    await updateUserPassword(req.userId, hashedPassword);
+    await updateUserPassword(
+      req.userId,
+      hashedPassword
+    );
 
     return res.status(200).json({
       success: true,
@@ -348,6 +449,7 @@ export const updatePassword = async (req, res) => {
     });
   } catch (error) {
     console.error("Update password error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -356,9 +458,11 @@ export const updatePassword = async (req, res) => {
 };
 
 // =====================================================
-// DELETE ACCOUNT (CASCADE deletes tasks)
+// DELETE ACCOUNT
+// CASCADE deletes tasks
 // DELETE /api/auth/account
 // =====================================================
+
 export const deleteAccount = async (req, res) => {
   try {
     const { password } = req.body;
@@ -371,6 +475,7 @@ export const deleteAccount = async (req, res) => {
     }
 
     const user = await findUserById(req.userId);
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -378,7 +483,11 @@ export const deleteAccount = async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
+    );
+
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
@@ -386,26 +495,51 @@ export const deleteAccount = async (req, res) => {
       });
     }
 
-    // Optional: Delete profile image from Cloudinary
-    if (user.profile_image && user.profile_image.includes("cloudinary")) {
+    // =================================================
+    // DELETE LOCAL PROFILE IMAGE
+    // =================================================
+
+    if (
+      user.profile_image &&
+      user.profile_image.startsWith("/uploads/")
+    ) {
+      const imagePath = path.join(
+        process.cwd(),
+        user.profile_image.replace(
+          /^\/uploads\//,
+          "uploads/"
+        )
+      );
+
       try {
-        const urlParts = user.profile_image.split("/");
-        const filename = urlParts[urlParts.length - 1];
-        const publicId = `taskmanager/profiles/${filename.split(".")[0]}`;
-        await cloudinary.uploader.destroy(publicId);
-      } catch (err) {
-        console.error("Cloudinary delete error:", err);
-        // Don't fail if image deletion fails
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+        }
+      } catch (error) {
+        console.error(
+          "Profile image delete error:",
+          error.message
+        );
       }
     }
 
+    // =================================================
+    // DELETE USER
+    // Tasks automatically delete because of
+    // ON DELETE CASCADE
+    // =================================================
+
     await deleteUserById(req.userId);
 
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    });
+    // =================================================
+    // CLEAR COOKIE
+    // =================================================
+
+    const cookieOptions = getCookieOptions();
+
+    delete cookieOptions.maxAge;
+
+    res.clearCookie("token", cookieOptions);
 
     return res.status(200).json({
       success: true,
@@ -413,6 +547,7 @@ export const deleteAccount = async (req, res) => {
     });
   } catch (error) {
     console.error("Delete account error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error",

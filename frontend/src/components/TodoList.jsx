@@ -292,11 +292,7 @@ function TodoList({ user, setUser, API_URL }) {
           >
             {user?.profile_image ? (
               <img
-                src={
-                  user.profile_image.startsWith("http")
-                    ? user.profile_image
-                    : `${API_URL}${user.profile_image}`
-                }
+               src={user.profile_image}
                 alt={user?.name || "User"}
                 className="h-9 w-9 shrink-0 rounded-full object-cover"
               />
@@ -390,11 +386,7 @@ function TodoList({ user, setUser, API_URL }) {
           >
             {user?.profile_image ? (
               <img
-                src={
-                  user.profile_image.startsWith("http")
-                    ? user.profile_image
-                    : `${API_URL}${user.profile_image}`
-                }
+               src={user.profile_image}
                 alt={user?.name || "User"}
                 className="h-8 w-8 rounded-full object-cover"
               />
